@@ -56,52 +56,62 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.handlers.clear()  # убираем дефолтный handler
 
-# 1) Stdout — только INFO и выше, краткий формат, без лишнего
+# 1) Stdout — краткие ошибки и ключевые события
+# Фильтр: в stdout идёт ERROR+ от всех + INFO только от poizon_bot
+class StdoutFilter(logging.Filter):
+    def filter(self, record):
+        # В stdout: все ERROR+, но INFO/WARNING только от poizon_bot
+        if record.levelno >= logging.ERROR:
+            return True
+        if record.name == "poizon_bot":
+            return True
+        return False
+
 stdout_handler = logging.StreamHandler(sys.stdout)
 stdout_handler.setLevel(logging.INFO)
+stdout_handler.addFilter(StdoutFilter())
 stdout_fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
 stdout_handler.setFormatter(stdout_fmt)
 logger.addHandler(stdout_handler)
 
-# 2) Файловый лог с ротацией (на volume /data/logs)
+# 2) Файловый лог с ротацией на midnight (на volume /data/logs)
 os.makedirs(LOG_DIR, exist_ok=True)
 file_handler = logging.handlers.TimedRotatingFileHandler(
     filename=os.path.join(LOG_DIR, "poizon-bot.log"),
     when="midnight",
     interval=1,
-    backupCount=30,  # храним 30 дней
+    backupCount=30,
     encoding="utf-8",
 )
-file_handler.setLevel(logging.DEBUG)  # в файл пишем всё подробно
+file_handler.setLevel(logging.DEBUG)
 file_fmt = logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
 file_handler.setFormatter(file_fmt)
 logger.addHandler(file_handler)
 
-# 3) Отдельный файл для ошибок (тоже ротация)
+# 3) Отдельный файл для ошибок с полным трейсом и контекстом
 error_handler = logging.handlers.TimedRotatingFileHandler(
     filename=os.path.join(LOG_DIR, "poizon-bot.error.log"),
     when="midnight",
     interval=1,
-    backupCount=90,  # ошибки храним дольше
+    backupCount=90,
     encoding="utf-8",
 )
 error_handler.setLevel(logging.ERROR)
-error_fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s", datefmt=LOG_DATE_FORMAT)
+error_fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s:%(lineno)d (%(funcName)s): %(message)s", datefmt=LOG_DATE_FORMAT)
 error_handler.setFormatter(error_fmt)
 logger.addHandler(error_handler)
 
 # Логгер для нашего бота
 log = logging.getLogger("poizon_bot")
 
-# Тихий режим для шумных библиотек
+# Тихий режим для шумных либ — их спам нам не нужен
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("apscheduler").setLevel(logging.WARNING)
 logging.getLogger("telegram.vendor.ptb_urllib3").setLevel(logging.WARNING)
-# Подавляем HTTP-логи с токеном бота
-logging.getLogger("telegram._bot").setLevel(logging.WARNING)
+logging.getLogger("telegram._bot").setLevel(logging.WARNING)  # без токена
 
-log.info(f"📁 Логи: stdout (INFO+) + файл {LOG_DIR}/poizon-bot.log (DEBUG+) + ошибки (ERROR+)")
+log.info(f"📁 Логи: stdout (ошибки+события) + {LOG_DIR}/poizon-bot.log (всё, 30дн) + .error.log (ошибки, 90дн)")
 
 # ─── Конфигурация (только из окружения) ───────────────────────────
 
