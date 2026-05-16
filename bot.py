@@ -40,6 +40,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     ContextTypes,
     PicklePersistence,
+    PersistenceInput,
 )
 from telegram.constants import ParseMode
 
@@ -625,7 +626,7 @@ def main():
     if not CHANNEL_ID:
         log.warning("⚠️ POIZON_CHANNEL_ID не указан — посты только в ЛС")
 
-    persistence = PicklePersistence(filepath="poizon_bot_data.pickle", store_data={"bot_data": True, "chat_data": True, "user_data": True})
+    persistence = PicklePersistence(filepath="poizon_bot_data.pickle", store_data=PersistenceInput(bot_data=True, chat_data=True, user_data=True))
 
     app = (
         Application.builder()
