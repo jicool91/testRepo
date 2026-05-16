@@ -168,6 +168,7 @@ TEST_PRODUCTS = [
     {"spuId":"701204960","title":"Air Jordan 1 Retro High OG Chicago","brand":"Jordan","price":1299,"currency":"CNY","image":"https://picsum.photos/seed/jordan1/800/800","url":"https://www.poizon.com/product/701204960"},
     {"spuId":"740936571","title":"Adidas Samba OG White Green","brand":"Adidas","price":659,"currency":"CNY","image":"https://picsum.photos/seed/samba/800/800","url":"https://www.poizon.com/product/740936571"},
     {"spuId":"712345678","title":"New Balance 990v6 Grey","brand":"New Balance","price":899,"currency":"CNY","image":"https://picsum.photos/seed/nb990/800/800","url":"https://www.poizon.com/product/712345678"},
+    {"spuId":"750000001","title":"Nike Revolution 7 White","brand":"Nike","price":260,"currency":"CNY","image":"https://picsum.photos/seed/rev7/800/800","url":"https://www.poizon.com/product/750000001"},
 ]
 
 # ─── Инициализация bot_data ───────────────────────────────────────
