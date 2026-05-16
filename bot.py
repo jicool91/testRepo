@@ -29,7 +29,7 @@ Poizon → Telegram Moderation Bot v3.
   POIZON_PRICE_RISE_PCT    — % роста для алерта (по умолч. 5)
 """
 
-import os, sys, json, asyncio, logging, random
+import os, sys, json, asyncio, logging, logging.handlers, random
 from datetime import datetime, time, timezone
 from typing import Optional
 
@@ -45,7 +45,52 @@ from telegram.ext import (
 from telegram.constants import ParseMode
 
 # ─── Настройка логирования ────────────────────────────────────────
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+LOG_DIR = "/data/logs"
+
+# Формат сообщений
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.handlers.clear()  # убираем дефолтный handler
+
+# 1) Stdout — только INFO и выше, краткий формат, без лишнего
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_handler.setLevel(logging.INFO)
+stdout_fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
+stdout_handler.setFormatter(stdout_fmt)
+logger.addHandler(stdout_handler)
+
+# 2) Файловый лог с ротацией (на volume /data/logs)
+os.makedirs(LOG_DIR, exist_ok=True)
+file_handler = logging.handlers.TimedRotatingFileHandler(
+    filename=os.path.join(LOG_DIR, "poizon-bot.log"),
+    when="midnight",
+    interval=1,
+    backupCount=30,  # храним 30 дней
+    encoding="utf-8",
+)
+file_handler.setLevel(logging.DEBUG)  # в файл пишем всё подробно
+file_fmt = logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
+file_handler.setFormatter(file_fmt)
+logger.addHandler(file_handler)
+
+# 3) Отдельный файл для ошибок (тоже ротация)
+error_handler = logging.handlers.TimedRotatingFileHandler(
+    filename=os.path.join(LOG_DIR, "poizon-bot.error.log"),
+    when="midnight",
+    interval=1,
+    backupCount=90,  # ошибки храним дольше
+    encoding="utf-8",
+)
+error_handler.setLevel(logging.ERROR)
+error_fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s", datefmt=LOG_DATE_FORMAT)
+error_handler.setFormatter(error_fmt)
+logger.addHandler(error_handler)
+
+# Логгер для нашего бота
 log = logging.getLogger("poizon_bot")
 
 # Тихий режим для шумных библиотек
@@ -53,9 +98,10 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("apscheduler").setLevel(logging.WARNING)
 logging.getLogger("telegram.vendor.ptb_urllib3").setLevel(logging.WARNING)
-
 # Подавляем HTTP-логи с токеном бота
 logging.getLogger("telegram._bot").setLevel(logging.WARNING)
+
+log.info(f"📁 Логи: stdout (INFO+) + файл {LOG_DIR}/poizon-bot.log (DEBUG+) + ошибки (ERROR+)")
 
 # ─── Конфигурация (только из окружения) ───────────────────────────
 
@@ -422,7 +468,7 @@ async def show_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def skip_current(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
-    spu_id = context.user_data.get("current_spu")
+    spu_id = context.user_data.get("current_spu") if context.user_data else context.bot_data.get("current_spu")
     if spu_id:
         bot_data = context.bot_data
         init_bot_data(bot_data)
@@ -464,8 +510,13 @@ async def send_next_product(context: ContextTypes.DEFAULT_TYPE, chat_id: int = N
     init_bot_data(bot_data)
 
     product = next_from_queue(bot_data)
-    context.user_data["current_spu"] = product["spuId"]
-    context.user_data["current_product"] = product
+    # Сохраняем текущий товар в bot_data (доступно из джобов без user_data)
+    bot_data["current_spu"] = product["spuId"]
+    bot_data["current_product"] = product
+    # Если есть user_data (вызов из команды, а не из джоба) — сохраняем и туда
+    if context.user_data is not None:
+        context.user_data["current_spu"] = product["spuId"]
+        context.user_data["current_product"] = product
 
     await send_product_to_chat(context, chat_id, product)
 
@@ -523,7 +574,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def approve_product(query, context, spu_id: str, bot_data: dict):
     """Аппрув товара → пост в канал + сохраняем для мониторинга цен."""
-    product = context.user_data.get("current_product", {})
+    product = context.user_data.get("current_product", {}) if context.user_data else context.bot_data.get("current_product", {})
     if product.get("spuId") != spu_id:
         product = find_product(bot_data, spu_id)
 
