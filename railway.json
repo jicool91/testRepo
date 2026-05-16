@@ -1,6 +1,6 @@
 {
   "name": "poizon-bot",
-  "description": "Poizon товары → модерация → Telegram канал",
+  "description": "Poizon товары модерация Telegram канал",
   "stack": "container",
   "env": {
     "POIZON_BOT_TOKEN": {
@@ -16,8 +16,27 @@
       "required": true
     },
     "POIZON_INTERVAL_MIN": {
-      "description": "Интервал между проверками (минуты)",
+      "description": "Интервал модерации (минуты)",
       "value": "10",
+      "required": false
+    },
+    "POIZON_CHECK_INTERVAL_H": {
+      "description": "Интервал проверки цен опубликованных товаров (часы)",
+      "value": "6",
+      "required": false
+    },
+    "POIZON_PRICE_DROP_PCT": {
+      "description": "Порог снижения цены для алерта (проценты)",
+      "value": "10",
+      "required": false
+    },
+    "POIZON_PRICE_RISE_PCT": {
+      "description": "Порог роста цены для алерта (проценты)",
+      "value": "5",
+      "required": false
+    },
+    "POIZON_CLIENT_SECRET": {
+      "description": "Poizon API secret_key (опционально)",
       "required": false
     }
   }

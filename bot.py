@@ -30,7 +30,7 @@ Poizon → Telegram Moderation Bot v3.
 """
 
 import os, sys, json, asyncio, logging, random
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from typing import Optional
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -296,7 +296,8 @@ async def fetch_current_price(spu_id: str, context: ContextTypes.DEFAULT_TYPE) -
     secret_key = os.environ.get("POIZON_CLIENT_SECRET", "")
     if secret_key:
         try:
-            data = get_spu_detail(spu_id, secret_key=secret_key)
+            # Синхронный API в asyncio.to_thread чтобы не блокировать event loop
+            data = await asyncio.to_thread(get_spu_detail, spu_id, 15, secret_key)
             if data and "result" in data:
                 result = data["result"]
                 price = result.get("price") or result.get("salePrice") or result.get("minPrice")
@@ -304,18 +305,15 @@ async def fetch_current_price(spu_id: str, context: ContextTypes.DEFAULT_TYPE) -
                     return float(price)
         except Exception as e:
             log.warning(f"API ошибка для {spu_id}: {e}")
-            pass
 
     # Фоллбэк для тестов: случайное изменение
-    current = 0
     bot_data = context.bot_data
     init_bot_data(bot_data)
     posted = bot_data.get("posted_posts", {})
     old_price = posted.get(spu_id, {}).get("price", 0)
     if old_price:
-        import random
-        # Бросаем кубик: 50% шанс, что цена изменилась
-        if random.random() < 0.1:  # 10% шанс тестового изменения
+        # Тестовая заглушка: 10% шанс изменения цены
+        if random.random() < 0.1:
             change = random.choice([-1, -1, 1])  # чаще вниз для теста
             return round(old_price * (1 + change * random.uniform(0.05, 0.20)), 0)
     return None
@@ -582,22 +580,31 @@ async def skip_product(query, spu_id: str, bot_data: dict):
 
 async def scheduled_post(context: ContextTypes.DEFAULT_TYPE):
     """Плановый показ товара на модерацию."""
-    bot_data = context.bot_data
-    init_bot_data(bot_data)
-    log.info(f"⏰ Плановый постинг... очередь: {get_pending_count(bot_data)}")
-    await send_next_product(context)
+    try:
+        bot_data = context.bot_data
+        init_bot_data(bot_data)
+        log.info(f"⏰ Плановый постинг... очередь: {get_pending_count(bot_data)}")
+        await send_next_product(context)
+    except Exception as e:
+        log.error(f"scheduled_post ошибка: {e}", exc_info=True)
 
 
 async def daily_digest_job(context: ContextTypes.DEFAULT_TYPE):
     """Ежедневный дайджест в канал."""
-    log.info("📊 Отправка ежедневного дайджеста")
-    await send_digest(context)
+    try:
+        log.info("📊 Отправка ежедневного дайджеста")
+        await send_digest(context)
+    except Exception as e:
+        log.error(f"daily_digest_job ошибка: {e}", exc_info=True)
 
 
 async def price_check_job(context: ContextTypes.DEFAULT_TYPE):
     """Плановая проверка цен опубликованных товаров."""
-    log.info(f"🔍 Плановая проверка цен (каждые {CHECK_INTERVAL_H} ч)")
-    await check_posted_prices(context)
+    try:
+        log.info(f"🔍 Плановая проверка цен (каждые {CHECK_INTERVAL_H} ч)")
+        await check_posted_prices(context)
+    except Exception as e:
+        log.error(f"price_check_job ошибка: {e}", exc_info=True)
 
 
 def seed_test_products(bot_data: dict):
@@ -661,7 +668,7 @@ def main():
         # Дайджест: 10:00 UTC ≈ 18:00 CST
         jq.run_daily(
             daily_digest_job,
-            time=datetime.time(10, 0, tzinfo=timezone.utc),
+            time=time(10, 0, tzinfo=timezone.utc),
             chat_id=ADMIN_ID,
             name="daily_digest",
         )
@@ -678,7 +685,13 @@ def main():
         log.info(f"🔍 Мониторинг цен: каждые {CHECK_INTERVAL_H} ч")
 
     log.info("🚀 Poizon бот v3 запущен!")
-    app.run_polling()
+    try:
+        app.run_polling(allowed_updates=["message", "callback_query"], drop_pending_updates=True)
+    except KeyboardInterrupt:
+        log.info("👋 Остановка бота...")
+    except Exception as e:
+        log.critical(f"💥 Фатальная ошибка: {e}", exc_info=True)
+        raise
 
 
 if __name__ == "__main__":
