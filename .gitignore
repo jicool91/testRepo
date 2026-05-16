@@ -2,4 +2,7 @@
 bot.log
 __pycache__/
 .env
+.env.*
 start_bot.sh
+credentials.json
+tokens.json
