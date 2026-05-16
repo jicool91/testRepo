@@ -29,7 +29,7 @@ Poizon → Telegram Moderation Bot v3.
   POIZON_PRICE_RISE_PCT    — % роста для алерта (по умолч. 5)
 """
 
-import os, sys, json, asyncio, logging, logging.handlers, random
+import os, sys, json, asyncio, logging, logging.handlers, random, html, traceback, time as time_module
 from datetime import datetime, time, timezone
 from typing import Optional
 
@@ -455,6 +455,21 @@ async def show_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     posted = bot_data.get("posted_posts", {})
     posted_cnt = len(posted)
     price_checks = stats.get("price_changes", 0)
+    
+    # Uptime
+    started_at = bot_data.get("started_at")
+    uptime_str = "?"
+    if started_at:
+        elapsed = time_module.time() - started_at
+        h, rem = divmod(int(elapsed), 3600)
+        m = rem // 60
+        uptime_str = f"{h}ч {m}мин"
+    
+    # Ошибки
+    errors = stats.get("errors", 0)
+    last_error = stats.get("last_error", "")
+    error_line = f"\n🔥 Ошибок: {errors}" if errors else ""
+    
     await update.message.reply_text(
         f"📊 <b>Статистика</b>\n"
         f"📦 В очереди: {get_pending_count(bot_data)}\n"
@@ -464,7 +479,8 @@ async def show_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔥 Ценовых алертов: {stats.get('total_alerts', 0)}\n"
         f"📊 Изменений цен: {price_checks}\n"
         f"⏱ Модерация: {INTERVAL_MIN} мин\n"
-        f"🔍 Мониторинг: {CHECK_INTERVAL_H} ч",
+        f"🔍 Мониторинг: {CHECK_INTERVAL_H} ч\n"
+        f"⏳ Uptime: {uptime_str}{error_line}",
         parse_mode=ParseMode.HTML
     )
 
@@ -712,9 +728,40 @@ def main():
     async def post_init(application: Application):
         bot_data = application.bot_data
         seed_test_products(bot_data)
+        bot_data["started_at"] = time_module.time()
         log.info(f"🚀 Бот инициализирован, в очереди: {get_pending_count(bot_data)}")
 
     app.post_init = post_init
+
+    # ─── Глобальный обработчик ошибок ────────────────────────────────
+    async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+        """Ловит все необработанные ошибки из хендлеров и джобов."""
+        log.error("💥 Глобальная ошибка:", exc_info=context.error)
+
+        # Считаем ошибки в статистику
+        bot_data = context.application.bot_data
+        init_bot_data(bot_data)
+        stats = bot_data["stats"]
+        stats["errors"] = stats.get("errors", 0) + 1
+        stats["last_error"] = str(context.error)[:200]
+        stats["last_error_time"] = datetime.now(timezone.utc).isoformat()
+
+        # Шлём админу краткое уведомление
+        tb = "".join(traceback.format_exception(None, context.error, context.error.__traceback__))
+        err_msg = str(context.error)[:500]
+        text = (
+            f"💥 <b>Ошибка</b>\n"
+            f"<code>{html.escape(err_msg)}</code>\n\n"
+            f"<pre>{html.escape(tb[:1500])}</pre>"
+        )
+        if len(text) > 4000:
+            text = text[:3997] + "..."
+        try:
+            await context.bot.send_message(chat_id=ADMIN_ID, text=text, parse_mode=ParseMode.HTML)
+        except Exception as e:
+            log.error(f"Не удалось отправить уведомление об ошибке: {e}")
+
+    app.add_error_handler(global_error_handler)
 
     # Команды
     app.add_handler(CommandHandler("start", start))
