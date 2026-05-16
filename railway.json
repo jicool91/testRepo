@@ -1,0 +1,27 @@
+{
+  "name": "poizon-bot",
+  "description": "Poizon товары → модерация → Telegram канал",
+  "repository": "https://github.com/jicool91/openclaw",
+  "stack": "container",
+  "env": {
+    "POIZON_BOT_TOKEN": {
+      "description": "Telegram bot token от @BotFather",
+      "required": true
+    },
+    "POIZON_ADMIN_ID": {
+      "description": "Твой Telegram ID",
+      "value": "6082666805",
+      "required": true
+    },
+    "POIZON_CHANNEL_ID": {
+      "description": "Канал для постов (@kickcn)",
+      "value": "@kickcn",
+      "required": true
+    },
+    "POIZON_INTERVAL_MIN": {
+      "description": "Интервал между проверками (минуты)",
+      "value": "10",
+      "required": false
+    }
+  }
+}

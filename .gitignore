@@ -1,0 +1,4 @@
+-e *.db
+bot.log
+__pycache__/
+.env
