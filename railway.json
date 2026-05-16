@@ -4,15 +4,15 @@
   "stack": "container",
   "env": {
     "POIZON_BOT_TOKEN": {
-      "description": "Telegram bot token от @BotFather",
+      "description": "Telegram bot token",
       "required": true
     },
     "POIZON_ADMIN_ID": {
-      "description": "Твой Telegram ID",
+      "description": "Telegram ID админа",
       "required": true
     },
     "POIZON_CHANNEL_ID": {
-      "description": "Канал для постов (@kickcn)",
+      "description": "ID канала для постов",
       "required": true
     },
     "POIZON_INTERVAL_MIN": {

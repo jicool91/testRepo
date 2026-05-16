@@ -10,8 +10,8 @@ Poizon → Telegram Moderation Bot.
 
 Переменные окружения:
   POIZON_BOT_TOKEN       — токен бота
-  POIZON_CHANNEL_ID      — @username или -100... канала
-  POIZON_ADMIN_ID        — твой Telegram ID (задаётся в Railway)
+  POIZON_CHANNEL_ID      — ID канала (задаётся в Railway)
+  POIZON_ADMIN_ID        — Telegram ID админа (задаётся в Railway)
   POIZON_INTERVAL_MIN    — интервал между постами (по умолч. 10)
 """
 
