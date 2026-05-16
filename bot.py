@@ -168,7 +168,7 @@ TEST_PRODUCTS = [
     {"spuId":"701204960","title":"Air Jordan 1 Retro High OG Chicago","brand":"Jordan","price":1299,"currency":"CNY","image":"https://picsum.photos/seed/jordan1/800/800","url":"https://www.poizon.com/product/701204960"},
     {"spuId":"740936571","title":"Adidas Samba OG White Green","brand":"Adidas","price":659,"currency":"CNY","image":"https://picsum.photos/seed/samba/800/800","url":"https://www.poizon.com/product/740936571"},
     {"spuId":"712345678","title":"New Balance 990v6 Grey","brand":"New Balance","price":899,"currency":"CNY","image":"https://picsum.photos/seed/nb990/800/800","url":"https://www.poizon.com/product/712345678"},
-    {"spuId":"750000001","title":"Nike Revolution 7 White","brand":"Nike","price":260,"currency":"CNY","image":"https://picsum.photos/seed/rev7/800/800","url":"https://www.poizon.com/product/750000001"},
+    {"spuId":"750000001","title":"Nike Revolution 7 White","brand":"Nike","price":260,"currency":"CNY","image":"assets/nike-revolution-7.jpg","url":"https://www.poizon.com/product/750000001"},
 ]
 
 # ─── Инициализация bot_data ───────────────────────────────────────
@@ -433,8 +433,12 @@ async def send_product_to_chat(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
     keyboard = get_moderation_keyboard(product["spuId"]) if not is_approve_mode else None
 
     try:
+        # Если image — локальный файл (assets/...), открываем как InputFile
+        img = product["image"]
+        if img.startswith("assets/"):
+            img = open(img, "rb")
         await context.bot.send_photo(
-            chat_id=chat_id, photo=product["image"],
+            chat_id=chat_id, photo=img,
             caption=caption, reply_markup=keyboard, parse_mode=ParseMode.HTML,
         )
         context.chat_data["last_has_photo"] = True
