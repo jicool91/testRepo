@@ -44,8 +44,18 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode
 
+# ─── Настройка логирования ────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("poizon_bot")
+
+# Тихий режим для шумных библиотек
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("apscheduler").setLevel(logging.WARNING)
+logging.getLogger("telegram.vendor.ptb_urllib3").setLevel(logging.WARNING)
+
+# Подавляем HTTP-логи с токеном бота
+logging.getLogger("telegram._bot").setLevel(logging.WARNING)
 
 # ─── Конфигурация (только из окружения) ───────────────────────────
 
@@ -626,7 +636,10 @@ def main():
     if not CHANNEL_ID:
         log.warning("⚠️ POIZON_CHANNEL_ID не указан — посты только в ЛС")
 
-    persistence = PicklePersistence(filepath="poizon_bot_data.pickle", store_data=PersistenceInput(bot_data=True, chat_data=True, user_data=True))
+    persistence = PicklePersistence(
+        filepath="poizon_bot_data.pickle",
+        store_data=PersistenceInput(bot_data=True, chat_data=True, user_data=True, callback_data=False),
+    )
 
     app = (
         Application.builder()
