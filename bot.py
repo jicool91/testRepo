@@ -11,7 +11,7 @@ Poizon → Telegram Moderation Bot.
 Переменные окружения:
   POIZON_BOT_TOKEN       — токен бота
   POIZON_CHANNEL_ID      — @username или -100... канала
-  POIZON_ADMIN_ID        — твой Telegram ID (6082666805)
+  POIZON_ADMIN_ID        — твой Telegram ID (задаётся в Railway)
   POIZON_INTERVAL_MIN    — интервал между постами (по умолч. 10)
 """
 
@@ -27,7 +27,7 @@ log = logging.getLogger("poizon_bot")
 
 BOT_TOKEN = os.environ.get("POIZON_BOT_TOKEN", "")
 CHANNEL_ID = os.environ.get("POIZON_CHANNEL_ID", "")
-ADMIN_ID = int(os.environ.get("POIZON_ADMIN_ID", "6082666805"))
+ADMIN_ID = int(os.environ.get("POIZON_ADMIN_ID", "0"))
 INTERVAL_MIN = int(os.environ.get("POIZON_INTERVAL_MIN", "10"))
 
 TEST_PRODUCTS = [

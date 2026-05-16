@@ -1,4 +1,5 @@
--e *.db
+*.db
 bot.log
 __pycache__/
 .env
+start_bot.sh
