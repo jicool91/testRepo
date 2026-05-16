@@ -75,12 +75,15 @@ stdout_handler.setFormatter(stdout_fmt)
 logger.addHandler(stdout_handler)
 
 # 2) Файловый лог с ротацией на midnight (на volume /data/logs)
+# 2) Файловый лог с ротацией по размеру (на volume /data/logs)
+LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+LOG_BACKUP_COUNT = 20             # максимум 200 MB логов
+
 os.makedirs(LOG_DIR, exist_ok=True)
-file_handler = logging.handlers.TimedRotatingFileHandler(
+file_handler = logging.handlers.RotatingFileHandler(
     filename=os.path.join(LOG_DIR, "poizon-bot.log"),
-    when="midnight",
-    interval=1,
-    backupCount=30,
+    maxBytes=LOG_MAX_BYTES,
+    backupCount=LOG_BACKUP_COUNT,
     encoding="utf-8",
 )
 file_handler.setLevel(logging.DEBUG)
@@ -89,11 +92,10 @@ file_handler.setFormatter(file_fmt)
 logger.addHandler(file_handler)
 
 # 3) Отдельный файл для ошибок с полным трейсом и контекстом
-error_handler = logging.handlers.TimedRotatingFileHandler(
+error_handler = logging.handlers.RotatingFileHandler(
     filename=os.path.join(LOG_DIR, "poizon-bot.error.log"),
-    when="midnight",
-    interval=1,
-    backupCount=90,
+    maxBytes=LOG_MAX_BYTES,
+    backupCount=60,  # максимум 600 MB для ошибок
     encoding="utf-8",
 )
 error_handler.setLevel(logging.ERROR)
@@ -111,7 +113,43 @@ logging.getLogger("apscheduler").setLevel(logging.WARNING)
 logging.getLogger("telegram.vendor.ptb_urllib3").setLevel(logging.WARNING)
 logging.getLogger("telegram._bot").setLevel(logging.WARNING)  # без токена
 
-log.info(f"📁 Логи: stdout (ошибки+события) + {LOG_DIR}/poizon-bot.log (всё, 30дн) + .error.log (ошибки, 90дн)")
+log.info(f"📁 Логи: stdout (ошибки+события) + {LOG_DIR}/poizon-bot.log (всё, 10MB ротация) + .error.log (ошибки, 10MB ротация)")
+
+# ─── Слежение за диском ────────────────────────────────────────────
+DISK_CLEANUP_THRESHOLD_PCT = 85  # при 85% заполнения начинаем чистить
+DISK_CRITICAL_PCT = 95
+
+async def check_disk_usage(context: ContextTypes.DEFAULT_TYPE):
+    """Проверка места на volume. Если подбираемся к лимиту — чистим старые логи."""
+    try:
+        stat = os.statvfs(LOG_DIR)
+        total = stat.f_frsize * stat.f_blocks
+        free = stat.f_frsize * stat.f_bfree
+        used_pct = (1 - free / total) * 100 if total else 0
+        
+        if used_pct >= DISK_CRITICAL_PCT:
+            log.warning(f"🚨 ДИСК КРИТИЧЕСКИЙ: {used_pct:.0f}% — экстренная чистка!")
+            clean_old_logs(keep_last=5)  # оставляем только 5 последних
+        elif used_pct >= DISK_CLEANUP_THRESHOLD_PCT:
+            log.info(f"⚠️ Диск заполнен на {used_pct:.0f}% — чищу старые логи")
+            clean_old_logs(keep_last=10)
+        else:
+            log.debug(f"💾 Диск: {used_pct:.0f}% занято ({total // (1024**3)} GB total)")
+    except Exception as e:
+        log.error(f"Ошибка проверки диска: {e}")
+
+
+def clean_old_logs(keep_last: int = 10):
+    """Удаляет старые ротированные логи, оставляя keep_last штук."""
+    import glob
+    for pattern in ["poizon-bot.log.*", "poizon-bot.error.log.*"]:
+        files = sorted(glob.glob(os.path.join(LOG_DIR, pattern)))
+        for f in files[:-keep_last]:
+            try:
+                os.remove(f)
+                log.info(f"🗑 Удалён старый лог: {os.path.basename(f)}")
+            except OSError as e:
+                log.error(f"Не удалось удалить {f}: {e}")
 
 # ─── Конфигурация (только из окружения) ───────────────────────────
 
@@ -805,6 +843,15 @@ def main():
             name="price_monitor",
         )
         log.info(f"🔍 Мониторинг цен: каждые {CHECK_INTERVAL_H} ч")
+
+        # 💾 Проверка диска: каждый час
+        jq.run_repeating(
+            check_disk_usage,
+            interval=3600,
+            first=300.0,  # через 5 минут после старта
+            name="disk_monitor",
+        )
+        log.info(f"💾 Мониторинг диска: каждый час")
 
     log.info("🚀 Poizon бот v3 запущен!")
     try:
